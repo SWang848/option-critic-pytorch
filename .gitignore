@@ -10,3 +10,6 @@ settings.json
 *.pyc
 runs/*
 analysis/*
+venv/*
+runs/*
+wandb/*
