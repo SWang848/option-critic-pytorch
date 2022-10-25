@@ -19,6 +19,12 @@ import wandb
 from crafting import MineCraftingEnv
 from crafting.task import RewardShaping, TaskObtainItem
 
+from option_graph.metrics.complexity import learning_complexity
+from option_graph.metrics.complexity.histograms import nodes_histograms
+from option_graph.option import Option
+
+from callbacks import WandbCallback
+from plots import save_requirement_graph, save_option_graph
 
 parser = argparse.ArgumentParser(description="Option Critic PyTorch")
 # parser.add_argument('--env', default='CartPole-v0', help='ROM to run')
@@ -48,12 +54,35 @@ parser.add_argument('--switch-goal', type=bool, default=False, help='switch goal
 
 def run(args):
 
-    # config = {
-    #     "agent": "OptionCritic"
-    # }
-    # run = wandb.init(project="OptionCritic", config=config, monitor_gym=True)
-    # timestamp = time.strftime("%Y%m%d_%H%M%S")
-    # run_dirname = f"{timestamp}-{run.id}"
+    config = {
+        "agent": "OptionCritic",
+        'optimal-eps': args.optimal_eps,
+        'frame-skip': args.frame_skip,
+        'learning-rate': args.learning_rate,
+        'gamma': args.gamma,
+        'epsilon-start': args.epsilon_start,
+        'epsilon-min': args.epsilon_min,
+        'epsilon-decay': args.epsilon_decay,
+        'max-history': args.max_history,
+        'batch-size': args.batch_size,
+        'freeze-interval': args.freeze_interval,
+        'update-frequency': args.update_frequency,
+        'termination-reg': args.termination_reg,
+        'entropy-reg': args.entropy_reg,
+        'num-options': args.num_options,
+        'temp': args.temp,
+        'max_steps_ep': args.max_steps_ep,
+        'max_steps_total': args.max_steps_total,
+        'cuda': args.cuda,
+        'seed': args.seed,
+        'logdir': args.logdir,
+        'exp': args.exp,
+        'switch-goal': args.switch_goal
+    }
+
+    run = wandb.init(project="OptionCritic", config=config, monitor_gym=True)
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    run_dirname = f"{timestamp}-{run.id}"
 
     env = MineCraftingEnv(max_step=args.max_steps_total, seed=args.seed)
     task = TaskObtainItem(env.world,env.world.item_from_name["wooden_pickaxe"])
@@ -86,6 +115,33 @@ def run(args):
     # logger = Logger(logdir=args.logdir, run_name=f"{OptionCriticFeatures.__name__}-{args.env}-{args.exp}-{time.ctime()}")
     logger = Logger(logdir=args.logdir, run_name=f"RandomCrafting-{args.exp}-{time.ctime()}")
 
+    # Get & save requirements graph
+    requirement_graph_path = save_requirement_graph(
+        run_dirname, env.world, title=str(env.world), figsize=(32, 18)
+    )
+
+    # Get & save solving option
+    all_options = env.world.get_all_options()
+    all_options_list = list(all_options.values())
+    solving_option: Option = all_options[f"Get {task.goal_item}"]
+    solving_option_graph_path = save_option_graph(solving_option, run_dirname)
+
+    # Compute complexities
+    used_nodes_all = nodes_histograms(all_options_list)
+    lcomp, comp_saved = learning_complexity(solving_option, used_nodes_all)
+    print(f"OPTION: {str(solving_option)}: {lcomp} ({comp_saved})")
+
+    wandb.log(
+        {
+            "task": str(task),
+            "solving_option": str(solving_option),
+            "learning_complexity": lcomp,
+            "total_complexity": lcomp + comp_saved,
+            "saved_complexity": comp_saved,
+            "requirement_graph": wandb.Image(requirement_graph_path),
+            "solving_option_graph": wandb.Image(solving_option_graph_path),
+        }
+    )
     steps = 0
     if args.switch_goal: print(f"Current goal {env.goal}")
     while steps < args.max_steps_total:
@@ -159,6 +215,8 @@ def run(args):
             logger.log_data(steps, actor_loss, critic_loss, entropy.item(), epsilon)
 
         logger.log_episode(steps, rewards, option_lengths, ep_steps, epsilon)
+    
+    run.finish()
 
 if __name__=="__main__":
     args = parser.parse_args()
