@@ -44,6 +44,8 @@ parser.add_argument('--entropy-reg', type=float, default=0.01, help=('Regulariza
 parser.add_argument('--num-options', type=int, default=2, help=('Number of options to create.'))
 parser.add_argument('--temp', type=float, default=1, help='Action distribution softmax tempurature param.')
 
+parser.add_argument('--reward-shapping', type=int, default=RewardShaping.ALL_USEFUL, help=('shapping rewards.'))
+
 parser.add_argument('--max_steps_ep', type=int, default=200, help='number of maximum steps per episode.')
 parser.add_argument('--max_steps_total', type=int, default=int(1e6), help='number of maximum steps to take.') # bout 4 million
 parser.add_argument('--cuda', type=bool, default=True, help='Enable CUDA training (recommended if possible).')
@@ -86,7 +88,7 @@ def run(args):
     wandb.config.update(args)
 
     env = MineCraftingEnv(max_step=args.max_steps_total, seed=args.seed)
-    task = TaskObtainItem(env.world,env.world.item_from_name["wood_plank"])
+    task = TaskObtainItem(env.world,env.world.item_from_name["wood_plank"],reward_shaping=RewardShaping(args.reward_shapping))
     env.add_task(task)
 
     is_atari = False
@@ -216,6 +218,7 @@ def run(args):
             logger.log_data(steps, actor_loss, critic_loss, entropy.item(), epsilon)
 
         logger.log_episode(steps, rewards, option_lengths, ep_steps, epsilon)
+        wandb.log({'reward':rewards, 'steps': steps, 'actor_loss':actor_loss, 'critic_loss':critic_loss, 'entropy':entropy, 'epsilon': epsilon})
     
     run.finish()
 
