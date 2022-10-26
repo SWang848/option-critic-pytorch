@@ -13,3 +13,4 @@ analysis/*
 venv/*
 runs/*
 wandb/*
+*.jpg

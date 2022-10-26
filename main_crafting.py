@@ -54,38 +54,39 @@ parser.add_argument('--switch-goal', type=bool, default=False, help='switch goal
 
 def run(args):
 
-    config = {
-        "agent": "OptionCritic",
-        'optimal-eps': args.optimal_eps,
-        'frame-skip': args.frame_skip,
-        'learning-rate': args.learning_rate,
-        'gamma': args.gamma,
-        'epsilon-start': args.epsilon_start,
-        'epsilon-min': args.epsilon_min,
-        'epsilon-decay': args.epsilon_decay,
-        'max-history': args.max_history,
-        'batch-size': args.batch_size,
-        'freeze-interval': args.freeze_interval,
-        'update-frequency': args.update_frequency,
-        'termination-reg': args.termination_reg,
-        'entropy-reg': args.entropy_reg,
-        'num-options': args.num_options,
-        'temp': args.temp,
-        'max_steps_ep': args.max_steps_ep,
-        'max_steps_total': args.max_steps_total,
-        'cuda': args.cuda,
-        'seed': args.seed,
-        'logdir': args.logdir,
-        'exp': args.exp,
-        'switch-goal': args.switch_goal
-    }
+    # config = {
+    #     "agent": "OptionCritic",
+    #     'optimal-eps': args.optimal_eps,
+    #     'frame-skip': args.frame_skip,
+    #     'learning-rate': args.learning_rate,
+    #     'gamma': args.gamma,
+    #     'epsilon-start': args.epsilon_start,
+    #     'epsilon-min': args.epsilon_min,
+    #     'epsilon-decay': args.epsilon_decay,
+    #     'max-history': args.max_history,
+    #     'batch-size': args.batch_size,
+    #     'freeze-interval': args.freeze_interval,
+    #     'update-frequency': args.update_frequency,
+    #     'termination-reg': args.termination_reg,
+    #     'entropy-reg': args.entropy_reg,
+    #     'num-options': args.num_options,
+    #     'temp': args.temp,
+    #     'max_steps_ep': args.max_steps_ep,
+    #     'max_steps_total': args.max_steps_total,
+    #     'cuda': args.cuda,
+    #     'seed': args.seed,
+    #     'logdir': args.logdir,
+    #     'exp': args.exp,
+    #     'switch-goal': args.switch_goal
+    # }
 
-    run = wandb.init(project="OptionCritic", config=config, monitor_gym=True)
+    run = wandb.init(project="OptionCritic", config={"agent":"OptionCrtic"}, monitor_gym=True)
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     run_dirname = f"{timestamp}-{run.id}"
+    wandb.config.update(args)
 
     env = MineCraftingEnv(max_step=args.max_steps_total, seed=args.seed)
-    task = TaskObtainItem(env.world,env.world.item_from_name["wooden_pickaxe"])
+    task = TaskObtainItem(env.world,env.world.item_from_name["wood_plank"])
     env.add_task(task)
 
     is_atari = False
