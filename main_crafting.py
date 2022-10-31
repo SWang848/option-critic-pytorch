@@ -243,5 +243,5 @@ if __name__=="__main__":
 
     }
 
-    sweep_id = wandb.sweep(sweep=sweep_configuration, project='OptionCritics')
+    sweep_id = wandb.sweep(sweep=sweep_configuration, project='OptionCritic')
     wandb.agent(sweep_id, function=run(args), count=10)
