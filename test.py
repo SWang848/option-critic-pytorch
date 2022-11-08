@@ -1,3 +1,5 @@
+from os import truncate
+from tarfile import is_tarfile
 import numpy as np
 import argparse
 import torch
@@ -14,8 +16,20 @@ from logger import Logger
 import time
 import wandb
 
+from sb3_contrib.common.maskable.utils import get_action_masks
+
+from crafting import MineCraftingEnv
+from crafting.task import RewardShaping, TaskObtainItem
+
+from option_graph.metrics.complexity import learning_complexity
+from option_graph.metrics.complexity.histograms import nodes_histograms
+from option_graph.option import Option
+
+from callbacks import WandbCallback
+from plots import save_requirement_graph, save_option_graph
+
 parser = argparse.ArgumentParser(description="Option Critic PyTorch")
-parser.add_argument('--env', default='CartPole-v0', help='ROM to run')
+parser.add_argument('--agent', default='OptionCritc', help='agent name')
 parser.add_argument('--optimal-eps', type=float, default=0.05, help='Epsilon when playing optimally')
 parser.add_argument('--frame-skip', default=4, type=int, help='Every how many frames to process')
 parser.add_argument('--learning-rate',type=float, default=.0005, help='Learning rate')
@@ -32,8 +46,10 @@ parser.add_argument('--entropy-reg', type=float, default=0.01, help=('Regulariza
 parser.add_argument('--num-options', type=int, default=2, help=('Number of options to create.'))
 parser.add_argument('--temp', type=float, default=1, help='Action distribution softmax tempurature param.')
 
-parser.add_argument('--max_steps_ep', type=int, default=18000, help='number of maximum steps per episode.')
-parser.add_argument('--max_steps_total', type=int, default=int(4e6), help='number of maximum steps to take.') # bout 4 million
+parser.add_argument('--reward-shapping', type=int, default=RewardShaping.DIRECT_USEFUL, help=('shapping rewards.'))
+
+parser.add_argument('--max_steps_ep', type=int, default=200, help='number of maximum steps per episode.')
+parser.add_argument('--max_steps_total', type=int, default=int(1e6), help='number of maximum steps to take.') # bout 4 million
 parser.add_argument('--cuda', type=bool, default=True, help='Enable CUDA training (recommended if possible).')
 parser.add_argument('--seed', type=int, default=0, help='Random seed for numpy, torch, random.')
 parser.add_argument('--logdir', type=str, default='runs', help='Directory for logging statistics')
@@ -42,13 +58,43 @@ parser.add_argument('--switch-goal', type=bool, default=False, help='switch goal
 
 def run(args):
 
-    run = wandb.init(project="OptionCritic-FourRooms", config={}, monitor_gym=True)
+    # config = {
+    #     "agent": "OptionCritic",
+    #     'optimal-eps': args.optimal_eps,
+    #     'frame-skip': args.frame_skip,
+    #     'learning-rate': args.learning_rate,
+    #     'gamma': args.gamma,
+    #     'epsilon-start': args.epsilon_start,
+    #     'epsilon-min': args.epsilon_min,
+    #     'epsilon-decay': args.epsilon_decay,
+    #     'max-history': args.max_history,
+    #     'batch-size': args.batch_size,
+    #     'freeze-interval': args.freeze_interval,
+    #     'update-frequency': args.update_frequency,
+    #     'termination-reg': args.termination_reg,
+    #     'entropy-reg': args.entropy_reg,
+    #     'num-options': args.num_options,
+    #     'temp': args.temp,
+    #     'max_steps_ep': args.max_steps_ep,
+    #     'max_steps_total': args.max_steps_total,
+    #     'cuda': args.cuda,
+    #     'seed': args.seed,
+    #     'logdir': args.logdir,
+    #     'exp': args.exp,
+    #     'switch-goal': args.switch_goal
+    # }
+
+    run = wandb.init(project="test", config={}, monitor_gym=True)
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     run_dirname = f"{timestamp}-{run.id}"
     wandb.config.update(args)
     config = wandb.config
 
-    env, is_atari = make_env(args.env)
+    env = MineCraftingEnv(max_step=config.max_steps_total, seed=config.seed)
+    task = TaskObtainItem(env.world,env.world.item_from_name["dirt"],reward_shaping=RewardShaping(eval(config.reward_shapping)))
+    env.add_task(task)
+
+    is_atari = False
     option_critic = OptionCriticConv if is_atari else OptionCriticFeatures
     device = torch.device('cuda' if torch.cuda.is_available() and config.cuda else 'cpu')
 
@@ -70,18 +116,19 @@ def run(args):
 
     np.random.seed(config.seed)
     torch.manual_seed(config.seed)
-    env.seed(config.seed)
 
     buffer = ReplayBuffer(capacity=config.max_history, seed=config.seed)
-    logger = Logger(logdir=config.logdir, run_name=f"{OptionCriticFeatures.__name__}-{config.env}-{config.exp}-{time.ctime()}")
+    # logger = Logger(logdir=config.logdir, run_name=f"{OptionCriticFeatures.__name__}-{config.env}-{config.exp}-{time.ctime()}")
+    logger = Logger(logdir=config.logdir, run_name=f"RandomCrafting-{config.exp}-{time.ctime()}")
 
-    steps = 0 ;
+    steps = 0
     if config.switch_goal: print(f"Current goal {env.goal}")
     while steps < config.max_steps_total:
 
         rewards = 0 ; option_lengths = {opt:[] for opt in range(config.num_options)}
 
-        obs   = env.reset()
+        obs = env.reset()[0]
+        
         state = option_critic.get_state(to_tensor(obs))
         greedy_option  = option_critic.greedy_option(state)
         current_option = 0
@@ -110,10 +157,11 @@ def run(args):
                 option_lengths[current_option].append(curr_op_len)
                 current_option = np.random.choice(config.num_options) if np.random.rand() < epsilon else greedy_option
                 curr_op_len = 0
-    
-            action, logp, entropy = option_critic.get_action(state, current_option)
+            
+            invalid_action_mask = torch.tensor(get_action_masks(env))
+            action, logp, entropy = option_critic.get_action(state, current_option, invalid_action_mask)
 
-            next_obs, reward, done, _ = env.step(action)
+            next_obs, reward, done, truncate, _ = env.step(action)
             buffer.push(obs, current_option, reward, next_obs, done)
             rewards += reward
 
@@ -148,7 +196,28 @@ def run(args):
 
         logger.log_episode(steps, rewards, option_lengths, ep_steps, epsilon)
         wandb.log({'reward':rewards, 'steps': steps, 'actor_loss':actor_loss, 'critic_loss':critic_loss, 'entropy':entropy, 'epsilon': epsilon})
+    
+    # run.finish()
 
 if __name__=="__main__":
     args = parser.parse_args()
     run(args)
+    sweep_configuration = {
+        'method': 'random',
+        'name': 'sweep',
+        'metric': {
+            'goal': 'maximize',
+            'name': 'rewards'
+        },
+        'parameters':{
+            'batch_size': {'values': [16, 32, 64]},
+            'learning_rate': {'max': 0.001, 'min': 0.0005},
+            'num_options': {'max': 10, 'min': 2},
+            'entropy_reg': {'max': 0.1, 'min': 0.01},
+            'termination_reg': {'max': 0.1, 'min': 0.01}
+        }
+
+    }
+
+    sweep_id = wandb.sweep(sweep=sweep_configuration, project='OptionCritic')
+    wandb.agent(sweep_id, function=run(args), count=10)

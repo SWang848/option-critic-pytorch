@@ -166,9 +166,25 @@ class OptionCriticFeatures(nn.Module):
     def get_terminations(self, state):
         return self.terminations(state).sigmoid() 
 
-    def get_action(self, state, option):
+    # def get_action(self, state, option):
+    #     logits = state.data @ self.options_W[option] + self.options_b[option]
+    #     action_dist = (logits / self.temperature).softmax(dim=-1)
+    #     action_dist = Categorical(action_dist)
+
+    #     action = action_dist.sample()
+    #     logp = action_dist.log_prob(action)
+    #     entropy = action_dist.entropy()
+
+    #     return action.item(), logp, entropy
+
+    def get_action(self, state, option, invalid_action_masks=None):
+
+        invalid_action_masks = invalid_action_masks.to(self.device)
+
         logits = state.data @ self.options_W[option] + self.options_b[option]
-        action_dist = (logits / self.temperature).softmax(dim=-1)
+        adjusted_logits = torch.where(invalid_action_masks, logits, torch.tensor(-1e+8).to(self.device))
+
+        action_dist = (adjusted_logits / self.temperature).softmax(dim=-1)
         action_dist = Categorical(action_dist)
 
         action = action_dist.sample()
