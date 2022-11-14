@@ -15,7 +15,7 @@ import time
 import wandb
 
 parser = argparse.ArgumentParser(description="Option Critic PyTorch")
-parser.add_argument('--env', default='CartPole-v0', help='ROM to run')
+parser.add_argument('--env', default='fourrooms', help='ROM to run')
 parser.add_argument('--optimal-eps', type=float, default=0.05, help='Epsilon when playing optimally')
 parser.add_argument('--frame-skip', default=4, type=int, help='Every how many frames to process')
 parser.add_argument('--learning-rate',type=float, default=.0005, help='Learning rate')
@@ -75,7 +75,7 @@ def run(args):
     buffer = ReplayBuffer(capacity=config.max_history, seed=config.seed)
     logger = Logger(logdir=config.logdir, run_name=f"{OptionCriticFeatures.__name__}-{config.env}-{config.exp}-{time.ctime()}")
 
-    steps = 0 ;
+    steps = 0 
     if config.switch_goal: print(f"Current goal {env.goal}")
     while steps < config.max_steps_total:
 

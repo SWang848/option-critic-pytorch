@@ -13,9 +13,11 @@ from crafting.task import (
 )
 
 
-# env = MineCraftingEnv(max_step=int(1e6), seed=1)
-# task = TaskObtainItem(env.world,env.world.item_from_name["wood_plank"],reward_shaping=RewardShaping(RewardShaping.DIRECT_USEFUL))
-# env.add_task(task)
+env = MineCraftingEnv(max_step=int(1e6), seed=1)
+task = TaskObtainItem(env.world,env.world.item_from_name["wood_plank"],reward_shaping=RewardShaping(RewardShaping.DIRECT_USEFUL))
+env.add_task(task)
+
+
 # action_masks = get_action_masks(env)
 # print(action_masks)
 

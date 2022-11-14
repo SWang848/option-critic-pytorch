@@ -47,7 +47,7 @@ parser.add_argument('--temp', type=float, default=1, help='Action distribution s
 parser.add_argument('--reward-shapping', type=int, default=RewardShaping.DIRECT_USEFUL, help=('shapping rewards.'))
 
 parser.add_argument('--max_steps_ep', type=int, default=200, help='number of maximum steps per episode.')
-parser.add_argument('--max_steps_total', type=int, default=int(1e6), help='number of maximum steps to take.') # bout 4 million
+parser.add_argument('--max_steps_total', type=int, default=int(1e5), help='number of maximum steps to take.') # bout 4 million
 parser.add_argument('--cuda', type=bool, default=True, help='Enable CUDA training (recommended if possible).')
 parser.add_argument('--seed', type=int, default=0, help='Random seed for numpy, torch, random.')
 parser.add_argument('--logdir', type=str, default='runs', help='Directory for logging statistics')
@@ -60,9 +60,7 @@ def run(args):
     #     "agent": "OptionCritic",
     #     'optimal-eps': args.optimal_eps,
     #     'frame-skip': args.frame_skip,
-    #     'learning-rate': args.learning_rate,
-    #     'gamma': args.gamma,
-    #     'epsilon-start': args.epsilon_start,
+    #     'learninresetn-start': args.epsilon_start,
     #     'epsilon-min': args.epsilon_min,
     #     'epsilon-decay': args.epsilon_decay,
     #     'max-history': args.max_history,
@@ -117,7 +115,7 @@ def run(args):
 
     buffer = ReplayBuffer(capacity=config.max_history, seed=config.seed)
     # logger = Logger(logdir=config.logdir, run_name=f"{OptionCriticFeatures.__name__}-{config.env}-{config.exp}-{time.ctime()}")
-    logger = Logger(logdir=config.logdir, run_name=f"RandomCrafting-{config.exp}-{time.ctime()}")
+    logger = Logger(logdir=config.logdir, run_name=f"MineCrafting-{config.exp}-{time.ctime()}")
 
     # Get & save requirements graph
     requirement_graph_path = save_requirement_graph(
@@ -152,7 +150,8 @@ def run(args):
 
         rewards = 0 ; option_lengths = {opt:[] for opt in range(config.num_options)}
 
-        obs = env.reset()[0]
+        obs, infos = env.reset()
+        invalid_action_mask = torch.tensor(infos["action_is_legal"])
         
         state = option_critic.get_state(to_tensor(obs))
         greedy_option  = option_critic.greedy_option(state)
@@ -182,11 +181,12 @@ def run(args):
                 option_lengths[current_option].append(curr_op_len)
                 current_option = np.random.choice(config.num_options) if np.random.rand() < epsilon else greedy_option
                 curr_op_len = 0
-    
-            action, logp, entropy = option_critic.get_action(state, current_option)
 
-            next_obs, reward, done, truncate, _ = env.step(action)
-            buffer.push(obs, current_option, reward, next_obs, done)
+            action, logp, entropy = option_critic.get_action(state, current_option, invalid_action_mask)
+
+            next_obs, reward, done, truncate, infos = env.step(action)
+            invalid_action_mask = torch.tensor(infos["action_is_legal"])
+            buffer.push(obs, current_option, reward, next_obs, done, invalid_action_mask)
             rewards += reward
 
             actor_loss, critic_loss = None, None
@@ -217,15 +217,16 @@ def run(args):
             obs = next_obs
 
             logger.log_data(steps, actor_loss, critic_loss, entropy.item(), epsilon)
-
+            wandb.log({'reward':rewards, 'steps': steps, 'actor_loss':actor_loss, 'critic_loss':critic_loss, 'entropy':entropy, 'epsilon': epsilon})
+        
         logger.log_episode(steps, rewards, option_lengths, ep_steps, epsilon)
-        wandb.log({'reward':rewards, 'steps': steps, 'actor_loss':actor_loss, 'critic_loss':critic_loss, 'entropy':entropy, 'epsilon': epsilon})
+        
     
     run.finish()
 
 if __name__=="__main__":
     args = parser.parse_args()
-    # run(args)
+    run(args)
     sweep_configuration = {
         'method': 'random',
         'name': 'sweep',
@@ -240,7 +241,6 @@ if __name__=="__main__":
             'entropy_reg': {'max': 0.1, 'min': 0.01},
             'termination_reg': {'max': 0.1, 'min': 0.01}
         }
-
     }
 
     sweep_id = wandb.sweep(sweep=sweep_configuration, project='OptionCritic')
