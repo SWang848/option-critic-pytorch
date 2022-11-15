@@ -23,10 +23,12 @@ from crafting.task import (
 from callbacks import WandbCallback
 from plots import save_requirement_graph, save_option_graph
 
+from wandb.integration.sb3 import WandbCallback
+
 if __name__ == "__main__":
 
     env_name = "MineCrafting-v1"
-    project = "crafting-benchmark"
+    project = "ppo-benchmark-dirt"
 
     config = {
         "agent": "MaskablePPO",
@@ -41,8 +43,8 @@ if __name__ == "__main__":
         "env_name": env_name,
         "env_seed": 1,
         "task_seed": None,
-        # "task_complexity": 243,
-        'task': 'wood_plank',
+        "task_complexity": None,
+        'task': 'obtain_dirt',
         "reward_shaping": RewardShaping.ALL_USEFUL.value,
         "max_episode_steps": "auto",
         "time_factor": 2.0,
@@ -56,6 +58,8 @@ if __name__ == "__main__":
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     run_dirname = f"{timestamp}-{run.id}"
     config = wandb.config
+
+    config.update({'allow_val_change':True})
 
     max_episode_steps = (
         config["max_episode_steps"]

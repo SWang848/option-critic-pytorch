@@ -57,9 +57,9 @@ class WandbCallback(WandbCallback):
 
     def _on_rollout_end(self):
         mean_reward = np.mean([ep_info["r"] for ep_info in self.model.ep_info_buffer])
-        mean_lenght = np.mean([ep_info["l"] for ep_info in self.model.ep_info_buffer])
+        mean_length = np.mean([ep_info["l"] for ep_info in self.model.ep_info_buffer])
         current_step = self.model.num_timesteps
         wandb.log(
-            {"mean_ep_return": mean_reward, "mean_ep_lenght": mean_lenght},
+            {"mean_ep_return": mean_reward, "mean_ep_length": mean_length},
             step=current_step,
         )

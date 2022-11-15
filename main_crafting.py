@@ -80,14 +80,14 @@ def run(args):
     #     'switch-goal': args.switch_goal
     # }
 
-    run = wandb.init(project="OptionCritic", config={}, monitor_gym=True)
+    run = wandb.init(project="OptionCritic-dirt", config={}, monitor_gym=True)
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     run_dirname = f"{timestamp}-{run.id}"
     wandb.config.update(args)
     config = wandb.config
 
     env = MineCraftingEnv(max_step=config.max_steps_total, seed=config.seed)
-    task = TaskObtainItem(env.world,env.world.item_from_name["wood_plank"],reward_shaping=RewardShaping(eval(config.reward_shapping)))
+    task = TaskObtainItem(env.world,env.world.item_from_name["dirt"],reward_shaping=RewardShaping(eval(config.reward_shapping)))
     env.add_task(task)
 
     is_atari = False
@@ -144,7 +144,7 @@ def run(args):
             "solving_option_graph": wandb.Image(solving_option_graph_path),
         }
     )
-    steps = 0
+    steps = 0; episodes = 0
     if config.switch_goal: print(f"Current goal {env.goal}")
     while steps < config.max_steps_total:
 
@@ -174,6 +174,8 @@ def run(args):
             break
 
         done = False ; ep_steps = 0 ; option_termination = True ; curr_op_len = 0
+        n_successes = 0; n_consecutive_sucesses = 0
+
         while not done and ep_steps < config.max_steps_ep:
             epsilon = option_critic.epsilon
 
@@ -215,9 +217,29 @@ def run(args):
             ep_steps += 1
             curr_op_len += 1
             obs = next_obs
+            
+            if done:
+                if infos['tasks_done']:
+                    n_successes += 1
+                    n_consecutive_sucesses += 1
+                else:
+                    n_consecutive_sucesses = 0
 
             logger.log_data(steps, actor_loss, critic_loss, entropy.item(), epsilon)
-            wandb.log({'reward':rewards, 'steps': steps, 'actor_loss':actor_loss, 'critic_loss':critic_loss, 'entropy':entropy, 'epsilon': epsilon})
+            wandb.log({
+                'reward': rewards,
+                'actor_loss': actor_loss, 
+                'critic_loss': critic_loss, 
+                'entropy': entropy, 
+                'epsilon': epsilon,
+            }, step=steps)
+
+        episodes += 1
+        wandb.log({
+            'mean_ep_reward': rewards/ep_steps,
+            'n_successes': n_successes,
+            'n_consecutive_sucesses': n_consecutive_sucesses
+        }, step=episodes)
         
         logger.log_episode(steps, rewards, option_lengths, ep_steps, epsilon)
         
@@ -243,5 +265,5 @@ if __name__=="__main__":
         }
     }
 
-    sweep_id = wandb.sweep(sweep=sweep_configuration, project='OptionCritic')
-    wandb.agent(sweep_id, function=run(args), count=10)
+    # sweep_id = wandb.sweep(sweep=sweep_configuration, project='OptionCritic')
+    # wandb.agent(sweep_id, function=run(args), count=10)
