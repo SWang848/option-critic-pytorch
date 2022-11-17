@@ -23,7 +23,7 @@ from crafting.task import (
 from callbacks import WandbCallback
 from plots import save_requirement_graph, save_option_graph
 
-from wandb.integration.sb3 import WandbCallback
+# from wandb.integration.sb3 import WandbCallback
 
 if __name__ == "__main__":
 
@@ -44,7 +44,7 @@ if __name__ == "__main__":
         "env_seed": 1,
         "task_seed": None,
         "task_complexity": None,
-        'task': 'obtain_dirt',
+        'task_name': 'obtain_dirt',
         "reward_shaping": RewardShaping.ALL_USEFUL.value,
         "max_episode_steps": "auto",
         "time_factor": 2.0,
@@ -102,12 +102,12 @@ if __name__ == "__main__":
         else:
             task = get_task(
                 world=env.world,
-                task_name=config["task"],
+                task_name=config["task_name"],
                 reward_shaping=reward_shaping,
                 seed=config["task_seed"],
             )
         print(f"{task=} | {reward_shaping=}")
-        config["task"] = task.name
+        config.update({"task":task.name})
 
         if not isinstance(config["max_episode_steps"], int):
             adaptative_max_step = adaptative_max_episode_step(
@@ -154,7 +154,7 @@ if __name__ == "__main__":
         config["policy_type"],
         env,
         policy_kwargs={"net_arch": net_arch},
-        seed=config["agenttask_seed"],
+        seed=config["task_seed"],
         verbose=1,
     )
 

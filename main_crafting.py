@@ -232,14 +232,17 @@ def run(args):
                 'critic_loss': critic_loss, 
                 'entropy': entropy, 
                 'epsilon': epsilon,
-            }, step=steps)
+                'mean_ep_reward': rewards/ep_steps,
+                'n_successes': n_successes,
+                'n_consecutive_sucesses': n_consecutive_sucesses
+            })
 
         episodes += 1
-        wandb.log({
-            'mean_ep_reward': rewards/ep_steps,
-            'n_successes': n_successes,
-            'n_consecutive_sucesses': n_consecutive_sucesses
-        }, step=episodes)
+        # wandb.log({
+        #     'mean_ep_reward': rewards/ep_steps,
+        #     'n_successes': n_successes,
+        #     'n_consecutive_sucesses': n_consecutive_sucesses
+        # })
         
         logger.log_episode(steps, rewards, option_lengths, ep_steps, epsilon)
         
