@@ -44,8 +44,8 @@ if __name__ == "__main__":
         "env_seed": 1,
         "task_seed": None,
         "task_complexity": None,
-        'task_name': 'obtain_dirt',
-        "reward_shaping": RewardShaping.ALL_USEFUL.value,
+        "task_name": "obtain_dirt",
+        "reward_shaping": RewardShaping.value,
         "max_episode_steps": "auto",
         "time_factor": 2.0,
         "n_items": 50,
@@ -59,7 +59,7 @@ if __name__ == "__main__":
     run_dirname = f"{timestamp}-{run.id}"
     config = wandb.config
 
-    config.update({'allow_val_change':True})
+    config.update({"allow_val_change": True})
 
     max_episode_steps = (
         config["max_episode_steps"]
@@ -107,7 +107,7 @@ if __name__ == "__main__":
                 seed=config["task_seed"],
             )
         print(f"{task=} | {reward_shaping=}")
-        config.update({"task":task.name})
+        config.update({"task": task.name})
 
         if not isinstance(config["max_episode_steps"], int):
             adaptative_max_step = adaptative_max_episode_step(
