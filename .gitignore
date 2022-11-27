@@ -15,3 +15,5 @@ runs/*
 wandb/*
 *.jpg
 *.pickle
+*.json
+*.mp4
