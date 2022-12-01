@@ -27,6 +27,7 @@ from callbacks import WandbCallback
 from plots import save_requirement_graph, save_option_graph
 
 parser = argparse.ArgumentParser(description="Option Critic PyTorch")
+parser.add_argument("--task", default="iron_ingot", help="the task name")
 parser.add_argument("--agent", default="OptionCritc", help="agent name")
 parser.add_argument(
     "--optimal-eps", type=float, default=0.05, help="Epsilon when playing optimally"
@@ -44,7 +45,7 @@ parser.add_argument(
     "--epsilon-decay",
     type=float,
     default=20000,
-    help=("Number of steps to minimum epsilon."),
+    help=("Number of steps to minimumlogger epsilon."),
 )
 parser.add_argument(
     "--max-history",
@@ -147,7 +148,7 @@ def run(args):
     #     'switch-goal': args.switch_goal
     # }
 
-    run = wandb.init(project="OptionCritic-dirt", config={}, monitor_gym=True)
+    run = wandb.init(project="OptionCritic-CRAFT_ITEMS", config={}, monitor_gym=True)
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     run_dirname = f"{timestamp}-{run.id}"
     wandb.config.update(args)
@@ -156,7 +157,7 @@ def run(args):
     env = MineCraftingEnv(max_step=config.max_steps_total, seed=config.seed)
     task = TaskObtainItem(
         env.world,
-        env.world.item_from_name["dirt"],
+        env.world.item_from_name[args.task],
         reward_shaping=RewardShaping(eval(config.reward_shapping)),
     )
     env.add_task(task, can_end=True)
@@ -363,6 +364,25 @@ def run(args):
 if __name__ == "__main__":
     args = parser.parse_args()
     run(args)
+    # sweep_configuration = {
+    #     "method": "random",
+    #     "name": "sweep",
+    #     "metric": {"goal": "maximize", "name": "rewards"},
+    #     "parameters": {
+    #         "task": {
+    #             "values": [
+    #                 "stick",
+    #                 "wood_plank",
+    #                 "iron_ingot",
+    #                 "gold_ingot",
+    #                 "paper",
+    #                 "book",
+    #                 "clock",
+    #                 "enchanting_table",
+    #             ]
+    #         },
+    #     },
+    # }
     sweep_configuration = {
         "method": "random",
         "name": "sweep",
@@ -376,5 +396,5 @@ if __name__ == "__main__":
         },
     }
 
-    # sweep_id = wandb.sweep(sweep=sweep_configuration, project='OptionCritic')
-    # wandb.agent(sweep_id, function=run(args), count=10)
+    sweep_id = wandb.sweep(sweep=sweep_configuration, project="OptionCritic")
+    # wandb.agent(sweep_id, function=run(args), count=8)
